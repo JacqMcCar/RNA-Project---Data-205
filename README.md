@@ -13,13 +13,12 @@ Hi! I’m a sophomore at Montgomery College majoring in Data Science, and I’m 
 
 ### Project Structure
 
-- Data/ - raw and processed datasets
-- Ingestion/ - data loading and cleaning
+- Data/ - Raw and processed datasets
+- Ingestion/ - Data loading and cleaning
 - EDA (Explotatory Data Analysis)/ - Graphs, summaries, early insights
-- Analysis/ - 
-
-
-
+- Analysis/ - Final modeling and results
+- Model/ - Saved models or outputs
+- Report/ - Presentations and final deliverables
 
 
 ### Author
