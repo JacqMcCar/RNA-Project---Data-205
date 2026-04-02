@@ -13,4 +13,13 @@ Hi! I’m a sophomore at Montgomery College majoring in Data Science, and I’m 
 
 ### Project Structure
 
-- Data/ - raw, 
+- Data/ - raw and processed datasets
+- Ingestion/ ->
+
+
+
+
+
+### Author
+
+Jacqueline McCarty
