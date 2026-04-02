@@ -8,4 +8,9 @@ Hi! I’m a sophomore at Montgomery College majoring in Data Science, and I’m 
 ### Tools Used 
 
 - R (RStudio/R Markdown)
-- 
+- tableau
+
+
+### Project Structure
+
+- Data/ - raw, 
