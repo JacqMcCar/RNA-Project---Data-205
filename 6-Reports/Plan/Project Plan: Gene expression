@@ -1,0 +1,56 @@
+# Project Plan: Gene Expression Analysis of Respiratory Illness Using RNA-seq Data 
+Jacqueline McCarty 
+Data
+This project will use gene expression data from the Gene Expression Omnibus (GEO) dataset GSE156063. The dataset contains RNA sequencing data from upper airway samples of 234 patients, including individuals with COVID-19, other viral infections, and non-viral respiratory illnesses. The dataset includes expression levels for approximately 15,979 genes. This dataset provides insight into how gene expression varies across different disease conditions. However, the RNA-seq data is very high dimensional and may contain noise, so preprocessing will be necessary. Additionally, gene expression values may need normalization to ensure the comparability across samples, and low expression genes might need to be filtered out.
+Research Goals and Questions
+Main Goal: Analyze gene expression patterns to classify respiratory illnesses and identify key biological differences between COVID-19 and other conditions.
+Research Questions
+1.	Which genes are most differentially expressed between COVID-19 and other respiratory illnesses?
+i.	Method: Compare gene expression levels across groups and identify differences using statistical analysis and visualizations. 
+2.	Can gene expression data classify COVID-19 vs non-COVID cases?
+i.	Method: classification models like a logistic regression or random forest to predict disease type and evaluate accuracy.
+3.	Which genes contribute most to classification accuracy?
+i.	Method: use a random forest to identify the most influential genes. 
+4.	Do patients cluster into distinct groups based on their gene expression profiles?
+i.	Method: use k-means clustering to group patients together and analyze the similarities between clusters. 
+5.	Do COVID-19 samples form distinct clusters in a PCA?
+i.	Method: use a PCA to reduce the dimensionality of RNA_seq data and visualize for clustering patterns
+6.	Are immune response related genes suppressed in COVID-19 patients? What about compared to others?
+i.	Method: compare the expression levels of known immune related genes across groups. (?)
+7.	How similar are the gene expression patterns between viral and non-viral infections?
+i.	Method: compare gene expression profiles between these groups using clustering. 
+8.	Can a reduced subset of genes still accurately classify disease type?
+i.	Method:  train the models using a smaller subset of top genes to compare their performance. 
+9.	Are there any overall patterns that exist across all patient samples?
+i.	Method: use heatmaps and PCA visualizations to identify patterns and trends in the gene expression. 
+10.	Which biological pathways appear most affected by COVID-19 infection?
+i.	Method: do a pathway analysis by grouping genes into known biological pathways and then analyzing which path shows the largest expression difference. 
+Tools, Methods, and Resources
+This project will use R (tidyverse, dplyr, ggplot2, and caret/randomForest) for analysis and visualization.
+•	Data Cleaning and Preparation:
+Gene expression counts will be normalized to account for sequencing differences. Low-expression genes may be filtered out to reduce noise and improve analysis.
+•	Exploratory Data Analysis (EDA):
+Summary statistics and visualizations will be used to understand the distribution of gene expression values. Heatmaps and basic plots will be used to visualize patterns across samples.
+•	Dimensionality Reduction:
+Principal Component Analysis (PCA) will be used to reduce dimensionality and visualize clustering patterns among patients.
+•	Clustering:
+k-means clustering will be applied to group patients based on gene expression similarities and identify natural groupings.
+•	Classification Models:
+Logistic regression and random forest models will be used to classify patients into COVID-19 vs. non-COVID groups. Model performance will be evaluated using accuracy and other metrics.
+•	Feature Importance:
+Random forest will be used to identify the most important genes contributing to classification.
+•	Pathway Analysis:
+Important genes will be grouped into biological pathways, and visualizations such as bar charts or dot plots will be created in R to identify which pathways are most affected in COVID-19 patients.
+Risks and Mitigations
+-	One major risk is the high dimensionality of RNA-seq data, which can lead to overfitting in models. This will be addressed using dimensionality reduction techniques (e.g., PCA) and feature selection.
+-	Another risk is potential noise or variability in gene expression data. This will be mitigated through normalization and filtering of low-expression genes.
+-	There is also a risk that classification models may not perform well due to overlapping biological signals between conditions. In this case, multiple models will be tested and compared to identify the best-performing approach.
+-	computational complexity may be an issue due to the large number of genes. This will be managed by reducing dimensionality and limiting analysis to the most informative features.
+Milestones
+Data Ingestion & Cleaning: Import dataset into R and preprocess gene expression data (3/30 – 4/4)
+Exploratory Analysis: Visualize data and identify patterns (4/2 – 4/12)
+Dimensionality Reduction & Clustering: Apply PCA and clustering methods
+Modeling: Build and evaluate classification models
+Visualization & Final Data Product: Create clear visualizations and summarize findings (4/10 – 4/24
+Final Preparation: Prepare slides and finalize report (4/24 – 5/5)
+Final Presentation: Present results (5/2 – 5/12)
