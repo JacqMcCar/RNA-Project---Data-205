@@ -1,0 +1,257 @@
+---
+title: "EDA RNAseq - Jacqueline McCarty"
+author: "Jacqueline McCarty"
+date: "2026-04-16"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r}
+library(tidyverse)
+library(pheatmap)
+library(ggplot2)
+library(stringr)
+
+```
+
+
+```{r}
+counts <- read.csv("gene dataset/GSE156063_swab_gene_counts.csv", row.names = 1)
+final_analysis_dataset <- read_csv("final_analysis_dataset.csv")
+
+# check dimensions
+dim(counts)
+# summary
+summary(as.vector(as.matrix(counts)))
+```
+
+We have ~16k genes across ~234 patients
+Data is highly skewed (typical for RNA-seq)
+```{r}
+# log transform 
+log_counts <- log1p(counts)
+
+# plot distribution
+hist(log_counts[,1], breaks = 50, main = "Gene Expression Distribution", col="skyblue")
+```
+	RNA data is skewed → log transform normalizes it
+	
+	
+```{r}
+gene_means <- rowMeans(log_counts)
+gene_vars <- apply(log_counts, 1, var)
+
+plot(gene_means, gene_vars,
+     xlab = "Mean Expression",
+     ylab = "Variance",
+     main = "Mean vs Variance")
+```
+High variance genes = biologically important
+	These will drive classification later
+	
+```{r}
+# keep genes expressed in many samples
+keep <- rowMeans(counts > 5) > 0.1
+filtered_counts <- counts[keep, ]
+
+log_filtered <- log1p(filtered_counts)
+
+dim(filtered_counts)
+```
+	Removed noisy genes
+	
+	
+	
+```{r}
+pca <- prcomp(t(log_filtered), scale. = TRUE)
+
+# plot
+plot(pca$x[,1], pca$x[,2],
+     xlab = "PC1",
+     ylab = "PC2",
+     main = "PCA of Gene Expression")
+```
+
+	INTERPRET:
+	•	If clusters appear → gene expression differs across patients
+	•	Supports classification goal
+
+```{r}
+final_analysis_dataset$condition <- str_extract(
+  final_analysis_dataset$`!Sample_characteristics_ch1`,
+  "NEG|POS"
+)
+```
+
+```{r}
+pca_df <- data.frame(
+  PC1 = pca$x[,1],
+  PC2 = pca$x[,2],
+  condition = final_analysis_dataset$condition   
+)
+
+# Plot
+ggplot(pca_df, aes(x = PC1, y = PC2, color = condition)) +
+  geom_point(size = 3, alpha = 0.8) +
+  labs(title = "PCA of Gene Expression",
+       color = "Condition") +
+  theme_minimal()
+```
+```{r}
+ggplot(pca_df, aes(x = PC1, y = PC2, color = final_analysis_dataset$sars_pcr_log10)) +
+  geom_point(size = 3) +
+  scale_color_viridis_c() +
+  theme_minimal()
+```
+
+(idk what this means just yet)
+
+- extracted disease labels from the metadata and used them to color PCA plots, allowing us to visually assess whether gene expression separates COVID and non-COVID samples
+
+
+
+
+	
+```{r}
+# select top variable genes
+top_genes <- order(gene_vars, decreasing = TRUE)[1:50]
+
+pheatmap(log_filtered[top_genes, ],
+         show_rownames = FALSE,
+         main = "Top Variable Genes Heatmap")
+```
+
+	INTERPRET:
+	•	Shows patterns across patients
+	•	Helps identify immune-related variation
+	
+
+```{r}
+sample_cor <- cor(log_filtered)
+
+heatmap(sample_cor, main = "Sample Correlation")
+```
+
+INTERPRET:
+	•	Similar samples cluster together
+	•	Could indicate disease groups
+	
+```{r}
+boxplot(log_filtered,
+        outline = FALSE,
+        main = "Expression Distribution per Sample")
+```
+INTERPRET:
+	•	Checks normalization consistency
+	
+	
+	
+EDA shows there is meaningful variation in gene expression across patients
+This suggests immune-related patterns may be detectable
+This supports building a classifier independent of viral load
+	
+	
+	
+	EDA summary 
+	The gene expression data shows a highly skewed distribution, which is typical for RNA-seq data, so a log transformation was applied to stabilize variance.
+
+After filtering low-expression genes, we focused on the most informative features.
+
+PCA revealed variation across samples, suggesting that gene expression profiles may separate different patient groups.
+
+The heatmap of highly variable genes shows structured patterns across samples, indicating that certain genes may drive biological differences.
+
+These findings support the feasibility of using gene expression data for classification tasks, which aligns with our goal of detecting immune response differences independent of viral load.
+
+
+
+```{r}
+final_analysis_dataset$covid_binary <- ifelse(
+  final_analysis_dataset$condition == "POS", 1, 0
+)
+```
+
+	
+	
+	
+	
+	immune_score vs viral load
+	
+```{r}
+ggplot(final_analysis_dataset,
+       aes(x = sars_pcr_log10, y = innate_score, color = condition)) +
+  geom_point(size = 3, alpha = 0.7) +
+  labs(
+    title = "Immune Response vs Viral Load",
+    x = "Viral Load (log10)",
+    y = "Innate Immune Score"
+  ) +
+  theme_minimal()
+```
+If separation exists: Immune response differs across conditions even at similar viral loads
+
+
+#Split into LOW vs HIGH viral load
+
+```{r}
+threshold <- median(final_analysis_dataset$sars_pcr_log10, na.rm = TRUE)
+
+final_analysis_dataset$viral_group <- ifelse(
+  final_analysis_dataset$sars_pcr_log10 < threshold,
+  "Low",
+  "High"
+)
+```
+
+Boxplot 
+```{r}
+ggplot(final_analysis_dataset,
+       aes(x = viral_group, y = innate_score, fill = condition)) +
+  geom_boxplot() +
+  labs(
+    title = "Immune Response by Viral Load Group",
+    x = "Viral Load Group",
+    y = "Innate Immune Score"
+  ) +
+  theme_minimal()
+```
+“Even in low viral load samples, immune response varies across conditions”
+
+#Logistic regression
+Does immune_score matter after controlling for viral load?
+```{r}
+model <- glm(
+  covid_binary ~ innate_score + sars_pcr_log10,
+  data = final_analysis_dataset,
+  family = "binomial"
+)
+
+summary(model)
+```
+
+
+
+
+
+
+only low viral load extra()
+
+```{r}
+low_data <- subset(final_analysis_dataset, viral_group == "Low")
+
+model_low <- glm(
+  covid_binary ~ innate_score,
+  data = low_data,
+  family = "binomial"
+)
+
+summary(model_low)
+```
+
+
+
+
+

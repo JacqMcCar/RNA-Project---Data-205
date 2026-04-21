@@ -1,0 +1,99 @@
+---
+title: "Comp DESeq2 EDA - Jacqueline McCarty"
+author: "Jacqueline McCarty"
+date: "2026-04-16"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+
+```{r}
+library(DESeq2)
+library(dplyr)
+library(tibble)
+```
+
+#Checking
+```{r}
+count_sample_cols <- colnames(counts2)[-1]
+metadata2 <- metadata2 %>%
+  arrange(match(sample_id, count_sample_cols))
+
+all(metadata2$sample_id == count_sample_cols)
+```
+
+#count matrix
+```{r}
+count_matrix <- counts2 %>%
+  column_to_rownames("GeneID") %>%
+  as.matrix()
+
+storage.mode(count_matrix) <- "integer"
+```
+
+# i want Healthy as the reference, so positive fold changes mean “higher in COVID”.
+
+```{r}
+metadata2$disease_state <- factor(
+  metadata2$disease_state,
+  levels = c("Healthy", "COVID-19")
+)
+
+rownames(metadata2) <- metadata2$sample_id
+```
+
+# focus on genes with a 'signal'
+```{r}
+keep <- rowSums(count_matrix >= 10) >= 3
+count_matrix_filtered <- count_matrix[keep, ]
+```
+
+
+#creating DESeq2 object
+```{r}
+dds <- DESeqDataSetFromMatrix(
+  countData = count_matrix_filtered,
+  colData = metadata2,
+  design = ~ disease_state
+)
+```
+
+```{r}
+dds <- DESeq(dds)
+```
+
+
+```{r}
+res <- results(dds, contrast = c("disease_state", "COVID-19", "Healthy"))
+```
+
+#Turning results into a table and sorting
+
+```{r}
+results_comp <- as.data.frame(res) %>%
+  rownames_to_column("GeneID") %>%
+  arrange(padj)
+
+head(results_comp, 20)
+```
+
+```{r}
+write.csv(results_comp, "DESeq2_COVID_vs_Healthy_results.csv", row.names = FALSE)
+```
+
+
+
+# getting significant genes
+```{r}
+sig_genes <- results_comp %>%
+  filter(!is.na(padj), padj < 0.05, abs(log2FoldChange) > 1)
+
+write.csv(sig_genes, "DESeq2_significant_genes.csv", row.names = FALSE)
+
+head(sig_genes, 20)
+```
+
+
