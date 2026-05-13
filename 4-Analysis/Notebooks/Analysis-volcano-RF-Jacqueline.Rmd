@@ -1,0 +1,346 @@
+---
+title: "Volcano plot"
+author: "Jacqueline McCarty"
+date: "2026-05-13"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r}
+library(tidyverse)
+library(limma)
+library(ggplot2)
+
+# 1. Load the data
+# We'll use the log-expression matrix and the final analysis metadata
+expression_data <- read.csv("log_expression_matrix.csv", row.names = 1) # Samples as rows
+metadata <- read.csv("final_analysis_dataset.csv")
+
+# 2. Align Metadata and Expression Data
+# limma expects genes as rows and samples as columns
+expr_matrix <- t(expression_data)
+
+# Ensure sample IDs in metadata match columns in expression matrix
+# We assume 'sample_id' in metadata matches the row names of expression_data
+metadata <- metadata %>% filter(sample_id %in% colnames(expr_matrix))
+expr_matrix <- expr_matrix[, metadata$sample_id]
+
+# 3. Define Groups
+# Based on your dataset (GSE156063), we usually compare "SC2" (COVID) vs "no virus"
+# We'll extract this from the 'char1' column or similar
+metadata$group <- ifelse(grepl("SC2", metadata$char1), "COVID", "Control")
+group <- factor(metadata$group, levels = c("Control", "COVID"))
+
+# 4. Differential Expression Analysis with limma
+design <- model.matrix(~group)
+fit <- lmFit(expr_matrix, design)
+fit <- eBayes(fit)
+
+# Get results table
+results <- topTable(fit, coef = 2, number = Inf) %>%
+  rownames_to_column(var = "Gene")
+
+# 5. Create the Volcano Plot
+# We define thresholds for significance (e.g., p < 0.05 and |logFC| > 1)
+results <- results %>%
+  mutate(change = case_when(
+    logFC > 1 & adj.P.Val < 0.05 ~ "Up-regulated",
+    logFC < -1 & adj.P.Val < 0.05 ~ "Down-regulated",
+    TRUE ~ "Not Significant"
+  ))
+
+ggplot(results, aes(x = logFC, y = -log10(adj.P.Val), color = change)) +
+  geom_point(alpha = 0.4, size = 1.5) +
+  scale_color_manual(values = c("Down-regulated" = "blue", 
+                                "Not Significant" = "grey", 
+                                "Up-regulated" = "red")) +
+  theme_minimal() +
+  geom_vline(xintercept = c(-1, 1), linetype = "dashed", color = "black") +
+  geom_hline(yintercept = -log10(0.05), linetype = "dashed", color = "black") +
+  labs(title = "Volcano Plot: COVID-19 vs Control",
+       subtitle = "Based on GSE156063 Cleaned Dataset",
+       x = "Log2 Fold Change",
+       y = "-Log10 Adjusted P-value") +
+  theme(legend.position = "bottom")
+```
+
+X-axis (Log2 Fold Change): Points to the right (positive) are genes with higher expression in the COVID group; points to the left (negative) are higher in the Control group.
+
+Y-axis (−log 10 P-value): The higher a point is on the plot, the more statistically significant the difference is.
+
+Coloring:
+
+Red: Significant genes up-regulated in COVID-19.
+
+Blue: Significant genes down-regulated in COVID-19.
+
+Grey: Genes that did not meet the statistical or fold-change threshold.
+
+
+
+```{r}
+library(ggplot2)
+library(dplyr)
+library(ggrepel)
+
+# 1. Load the results and annotation data
+results <- read.csv("gene dataset/Compliment dataset/DESeq2_COVID_vs_Healthy_results.csv")
+# Load annotation to get Gene Symbols if available
+annotation <- read.csv("gene dataset/Compliment dataset/counts_with_annotation.csv") %>%
+  select(GeneID, Symbol) %>%
+  distinct()
+
+# 2. Merge results with gene symbols
+df <- results %>%
+  left_join(annotation, by = "GeneID") %>%
+  filter(!is.na(padj)) # Remove rows with NA p-values
+
+# 3. Define significance thresholds
+lfc_threshold <- 1.0
+pval_threshold <- 0.05
+
+# 4. Categorize genes for coloring
+df <- df %>%
+  mutate(change = case_when(
+    log2FoldChange > lfc_threshold & padj < pval_threshold ~ "Increased in COVID-19",
+    log2FoldChange < -lfc_threshold & padj < pval_threshold ~ "Decreased in COVID-19",
+    TRUE ~ "Not Significant"
+  ))
+
+# 5. Select top 10 genes to label (by significance)
+top_genes <- df %>%
+  filter(change != "Not Significant") %>%
+  arrange(padj) %>%
+  head(10)
+
+# 6. Create the Volcano Plot
+ggplot(df, aes(x = log2FoldChange, y = -log10(padj), color = change)) +
+  geom_point(alpha = 0.4, size = 1.2) +
+  scale_color_manual(values = c("Decreased in COVID-19" = "blue", 
+                                "Not Significant" = "grey", 
+                                "Increased in COVID-19" = "red")) +
+  geom_vline(xintercept = c(-lfc_threshold, lfc_threshold), linetype = "dashed") +
+  geom_hline(yintercept = -log10(pval_threshold), linetype = "dashed") +
+  # Add labels for top genes
+  geom_text_repel(data = top_genes, aes(label = Symbol), 
+                  size = 3, color = "black", max.overlaps = 10) +
+  theme_minimal() +
+  labs(title = "Volcano Plot: COVID-19 vs Healthy",
+       subtitle = "Significant genes labeled by Symbol",
+       x = "Increase in Expression (Log2 Fold Change)",
+       y = "Statistical Significance (-Log10 P-val)",
+       color = "Expression Status",
+       caption = "Source: National Center for Biotechnology Information") +
+  theme(legend.position = "bottom")
+```
+
+
+
+```{r}
+df <- read.csv("gene dataset/Compliment dataset/DESeq2_COVID_vs_Healthy_results.csv") %>%
+  filter(!is.na(padj))
+
+# 2. Use "Increased" and "Decreased" for labels
+df <- df %>%
+  mutate(Status = case_when(
+    log2FoldChange > 1 & padj < 0.05 ~ "Increased in COVID-19",
+    log2FoldChange < -1 & padj < 0.05 ~ "Decreased in COVID-19",
+    TRUE ~ "No Significant Change"
+  ))
+
+# 3. Create the plot
+ggplot(df, aes(x = log2FoldChange, y = -log10(padj), color = Status)) +
+  geom_point(alpha = 0.4, size = 1.2) +
+  scale_color_manual(values = c("Decreased in COVID-19" = "blue", 
+                                "No Significant Change" = "grey", 
+                                "Increased in COVID-19" = "red")) +
+  geom_vline(xintercept = c(-1, 1), linetype = "dashed", alpha = 0.5) +
+  geom_hline(yintercept = -log10(0.05), linetype = "dashed", alpha = 0.5) +
+  theme_minimal() +
+  labs(
+    title = "Gene Expression Changes: COVID-19 vs Healthy Patients",
+    x = "Increase in Expression (Log2 Fold Change)",
+    y = "Statistical Significance (-Log10 P-val)",
+    caption = "Source: National Center for Biotechnology Information"
+  ) +
+  theme(
+    legend.position = "bottom",
+    plot.title = element_text(face = "bold", size = 14),
+    plot.caption = element_text(hjust = 0, face = "italic")
+  )
+```
+
+```{r}
+library(randomForest)
+library(dplyr)
+library(tidyr)
+
+# 1. Load your data
+counts <- read.csv("gene dataset/Compliment dataset/counts2_clean.csv", row.names = 1)
+metadata <- read.csv("gene dataset/Compliment dataset/metadata2_clean.csv")
+results <- read.csv("gene dataset/Compliment dataset/DESeq2_COVID_vs_Healthy_results.csv")
+
+# 2. Transpose and fix Gene names
+# We add "G_" to the start of every GeneID so R doesn't treat them as numbers
+t_counts <- as.data.frame(t(counts))
+colnames(t_counts) <- paste0("G_", colnames(t_counts))
+t_counts$sample_id <- rownames(t_counts)
+
+# Do the same for your top genes list
+top_genes_list <- paste0("G_", results$GeneID[order(results$padj)])
+
+# 3. Merge with metadata
+data_for_rf <- merge(t_counts, metadata[, c("sample_id", "disease_state")], by = "sample_id")
+data_for_rf$disease_state <- as.factor(data_for_rf$disease_state)
+
+# 4. Corrected Function
+run_rf_comparison <- function(n_genes, full_data, gene_ranking) {
+  # Select the top N genes that actually exist in our data
+  selected_genes <- intersect(gene_ranking, colnames(full_data))[1:n_genes]
+  
+  # Subset data to only include these genes and the target label
+  rf_subset <- full_data[, c(selected_genes, "disease_state")]
+  
+  # Train model
+  set.seed(123)
+  # Using the data argument directly instead of a formula helps avoid naming errors
+  rf_model <- randomForest(x = rf_subset[, -ncol(rf_subset)], 
+                           y = rf_subset$disease_state, 
+                           ntree = 500)
+  
+  cat("\n==============================================\n")
+  cat("   Random Forest with Top", n_genes, "Genes\n")
+  cat("==============================================\n")
+  print(rf_model$confusion)
+  
+  # Calculate and print accuracy
+  accuracy <- sum(diag(rf_model$confusion)) / sum(rf_model$confusion[,1:2])
+  cat("\nOverall Accuracy:", round(accuracy * 100, 2), "%\n")
+  
+  return(rf_model)
+}
+
+# 5. Run the models
+model_10  <- run_rf_comparison(10, data_for_rf, top_genes_list)
+model_25  <- run_rf_comparison(25, data_for_rf, top_genes_list)
+model_50  <- run_rf_comparison(50, data_for_rf, top_genes_list)
+model_100 <- run_rf_comparison(100, data_for_rf, top_genes_list)
+```
+
+```{r}
+library(randomForest)
+library(caret)
+library(dplyr)
+
+# Load your datasets
+counts <- read.csv("gene dataset/Compliment dataset/counts2_clean.csv", row.names = 1)
+metadata <- read.csv("gene dataset/Compliment dataset/metadata2_clean.csv")
+results <- read.csv("gene dataset/Compliment dataset/DESeq2_COVID_vs_Healthy_results.csv")
+
+# Prepare Expression Data: Transpose and add "G_" prefix to Gene IDs
+t_counts <- as.data.frame(t(counts))
+colnames(t_counts) <- paste0("G_", colnames(t_counts))
+t_counts$sample_id <- rownames(t_counts)
+
+# Identify Top Genes sorted by significance (padj)
+top_genes_list <- paste0("G_", results$GeneID[order(results$padj)])
+
+# Merge with metadata to get 'disease_state'
+data_for_rf <- merge(t_counts, metadata[, c("sample_id", "disease_state")], by = "sample_id")
+data_for_rf$disease_state <- as.factor(data_for_rf$disease_state)
+```
+
+
+```{r}
+# Subset data for top 10 genes
+genes_10 <- intersect(top_genes_list, colnames(data_for_rf))[1:10]
+df_10 <- data_for_rf[, c(genes_10, "disease_state")]
+
+set.seed(123)
+rf_10 <- randomForest(disease_state ~ ., data = df_10, ntree = 500, importance = TRUE)
+
+# Print the Detailed Stats you requested
+confusionMatrix(rf_10$predicted, df_10$disease_state)
+```
+
+
+```{r}
+# Subset data for top 25 genes
+genes_25 <- intersect(top_genes_list, colnames(data_for_rf))[1:25]
+df_25 <- data_for_rf[, c(genes_25, "disease_state")]
+
+set.seed(123)
+rf_25 <- randomForest(disease_state ~ ., data = df_25, ntree = 500, importance = TRUE)
+
+# Print the Detailed Stats
+confusionMatrix(rf_25$predicted, df_25$disease_state)
+```
+
+```{r}
+# Subset data for top 50 genes
+genes_50 <- intersect(top_genes_list, colnames(data_for_rf))[1:50]
+df_50 <- data_for_rf[, c(genes_50, "disease_state")]
+
+set.seed(123)
+rf_50 <- randomForest(disease_state ~ ., data = df_50, ntree = 500, importance = TRUE)
+
+# Print the Detailed Stats
+confusionMatrix(rf_50$predicted, df_50$disease_state)
+```
+
+
+```{r}
+# Subset data for top 100 genes
+genes_100 <- intersect(top_genes_list, colnames(data_for_rf))[1:100]
+df_100 <- data_for_rf[, c(genes_100, "disease_state")]
+
+set.seed(123)
+rf_100 <- randomForest(disease_state ~ ., data = df_100, ntree = 500, importance = TRUE)
+
+# Print the Detailed Stats
+confusionMatrix(rf_100$predicted, df_100$disease_state)
+```
+
+
+```{r}
+# Subset data for top 6 genes
+genes_100 <- intersect(top_genes_list, colnames(data_for_rf))[1:6]
+df_100 <- data_for_rf[, c(genes_100, "disease_state")]
+
+set.seed(123)
+rf_100 <- randomForest(disease_state ~ ., data = df_100, ntree = 500, importance = TRUE)
+
+# Print the Detailed Stats
+confusionMatrix(rf_100$predicted, df_100$disease_state)
+```
+
+```{r}
+# Separate the features (x) and the target (y)
+x_data <- data_for_rf[, colnames(data_for_rf) != "disease_state" & colnames(data_for_rf) != "sample_id"]
+y_data <- data_for_rf$disease_state
+
+set.seed(123)
+# Passing x and y directly avoids the "Protection Stack" error
+rf_all <- randomForest(x = x_data, y = y_data, ntree = 500)
+
+print("--- Results for ALL GENES ---")
+confusionMatrix(rf_all$predicted, y_data)
+
+```
+
+```{r}
+#RANDOM 50 GENES ---
+# This proves that the 'Top 50' were actually important
+set.seed(456)
+random_genes <- sample(colnames(t_counts), 50)
+df_random <- data_for_rf[, c(random_genes, "disease_state")]
+
+set.seed(123)
+rf_random <- randomForest(disease_state ~ ., data = df_random, ntree = 500)
+print("--- Results for RANDOM 50 GENES ---")
+confusionMatrix(rf_random$predicted, df_random$disease_state)
+```
+
