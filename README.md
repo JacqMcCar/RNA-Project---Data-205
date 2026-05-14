@@ -8,7 +8,9 @@ My project is analyzing gene expression data to better understand respiratory il
 ### Tools Used 
 
 - R (RStudio/R Markdown)
-- tableau
+- DESeq2
+- Random Forest
+- ggplot
 
 
 ### Project Structure
